@@ -1,0 +1,11 @@
+{---BEGIN_SUBJECT---}
+This is my subject
+{---END_SUBJECT---}
+
+{---BEGIN_BODY---}
+Hi {{first_name}},
+
+Wanted you to get this message and I hope you can be very happy!
+
+{{sender_first_name}} {{sender_last_name}}
+{---END_BODY---}
