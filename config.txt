@@ -1,1 +1,0 @@
-{"sender_first_name":"Jimbo","sender_last_name":"Delivery","sender_email":"greg@learn2earn.org","store_password":"n","alternate_display_email":"y","sender_display_email":"greg@whooosreading.org"}
