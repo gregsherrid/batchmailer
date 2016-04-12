@@ -13,6 +13,8 @@ def main
 end
 
 BASE = "https://raw.githubusercontent.com/gregsherrid/batchmailer/master"
+
+# I hope its ok to update the source code of a file that's currently running...
 FILES_TO_UPDATE = ["README.md", "main.rb", "updater.rb"]
 
 main
