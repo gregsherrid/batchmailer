@@ -1,13 +1,16 @@
 require 'net/smtp'
+require 'rubygems'
 require 'json'
 require 'csv'
 
 def main
-	template = load_template
 	config = get_config
+
+	template = load_template
 	mailing_list = load_mailing_list(config)
 
 	mailing_list.each do |member|
+		puts "Sending #{ member["email"] }..."
 		message = compose_message(member, template, config)
 		send_message(member, message, config)
 	end
@@ -19,14 +22,14 @@ def compose_message(member, template, config)
 		puts "Template should have one SUBJECT"
 		exit
 	end
-	subject = subject[0].gsub(BEGIN_SUBJECT, "").gsub(END_SUBJECT, "").strip
+	subject = subject[0].gsub(/#{ BEGIN_SUBJECT }/, "").gsub(/#{ END_SUBJECT }/, "").strip
 
 	body = template.match(/#{ BEGIN_BODY }.*#{ END_BODY }/m)
 	if body.nil? || body.length != 1
 		puts "Template should have one BODY"
 		exit
 	end
-	body = body[0].gsub(BEGIN_BODY, "").gsub(END_BODY, "").strip
+	body = body[0].gsub(/#{BEGIN_BODY}/, "").gsub(/#{ END_BODY }/, "").strip
 
 	custom_values = config.merge(member)
 
@@ -43,7 +46,7 @@ def compose_message(member, template, config)
 end
 
 def send_message(member, message, config)
-	smtp = Net::SMTP.new 'smtp.gmail.com', 587
+	smtp = Net::SMTP.new('smtp.gmail.com', 587)
 	smtp.enable_starttls
 
 	password = config["sender_password"] ||= get_input("Enter password (won't be saved): ")
@@ -65,7 +68,12 @@ end
 def load_mailing_list(config)
 	list_file = ARGV[1]
 	if list_file && File.exist?(list_file)
-		CSV.read(list_file, headers: true)
+		parse_csv(list_file)
+
+	elsif get_input("Test send to #{ config['sender_email'] } (y/n): ").downcase != "y"
+		get_input("Pick list .csv file (press enter): ")
+		list_file = open_file_picker("Pick Template File")
+		parse_csv(list_file)
 	else
 		# Load test data
 		[{
@@ -80,13 +88,10 @@ def load_template
 	template_file = ARGV[0]
 
 	if template_file.nil? || !File.exist?(template_file)
-		puts "Please provide a template file. Valid command format:"
-		puts ">> ruby main.rb ./templates/sample.txt ./lists/sample.csv"
-		puts ""
-		puts "(2nd argument, the list, is optional. If empty, a test email will send)"
-		exit
+		get_input("Pick template .txt file (press enter): ")
+		template_file = open_file_picker("Pick List File")
 	end
-
+	puts File.exist?(template_file)
 	File.read(template_file)
 end
 
@@ -130,12 +135,38 @@ def get_input(query)
 	STDIN.gets.chomp.strip
 end
 
+def open_file_picker(title)
+	if RUBY_PLATFORM.include?("linux")
+		`zenity --title=#{ title } --file-selection`.strip
+	else
+
+	end
+end
+
+def parse_csv(file)
+	rows = []
+	CSV.open(file, "r") do |row|
+		rows << row
+	end
+	header = rows.shift
+
+	rows.map do |row|
+		i = 0
+		row_hash = {}
+		header.each do |h|
+			row_hash[h] = row[i]
+			i += 1
+		end
+		row_hash
+	end
+end
+
 CONFIG_PATH = "./config.txt"
 
 # Template flags
-BEGIN_SUBJECT = "{---BEGIN_SUBJECT---}"
-END_SUBJECT   = "{---END_SUBJECT---}"
-BEGIN_BODY    = "{---BEGIN_BODY---}"
-END_BODY      = "{---END_BODY---}"
+BEGIN_SUBJECT = "\\{---BEGIN_SUBJECT---\\}"
+END_SUBJECT   = "\\{---END_SUBJECT---\\}"
+BEGIN_BODY    = "\\{---BEGIN_BODY---\\}"
+END_BODY      = "\\{---END_BODY---\\}"
 
 main
