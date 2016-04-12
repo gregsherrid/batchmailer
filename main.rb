@@ -120,6 +120,11 @@ def get_config
 		config["sender_display_email"] = config["sender_email"]
 	end
 
+	config["use_bcc"] = get_input("Add BCC address (y/n): ").downcase
+	if config["use_bcc"] == "y"
+		config["bcc_email"] = get_input("BCC address: ")
+	end
+
 	File.open(CONFIG_PATH, "w") do |file|
 		file.puts config.to_json
 	end
