@@ -1,7 +1,6 @@
 require 'net/smtp'
 require 'rubygems'
 require 'json'
-require 'csv'
 
 def main
 	config = get_config
@@ -9,16 +8,14 @@ def main
 	template = load_template
 	mailing_list = load_mailing_list(config)
 
-	puts "---"
-	puts mailing_list
-	puts "---"
-
 	config["sender_password"] ||= get_input("Enter password (won't be saved): ")
 
 	mailing_list.each do |member|
-		puts "Sending #{ member["email"] }..."
-		message = compose_message(member, template, config)
-		send_message(member, message, config)
+		if member["email"] && !member["email"].empty?
+			puts "Sending #{ member["email"] }..."
+			message = compose_message(member, template, config)
+			send_message(member, message, config)
+		end
 	end
 end
 
@@ -144,7 +141,7 @@ end
 def open_file_picker(title)
 	if RUBY_PLATFORM.include?("linux")
 		`zenity --title=#{ title } --file-selection`.strip
-	elsif File.exist?(COCOA_DIALOG_PATH + "--")
+	elsif File.exist?(COCOA_DIALOG_PATH)
 		`#{ COCOA_DIALOG_PATH } fileselect --title=#{ title }`.strip
 	else
 		puts "NOTICE: If you are using MacOS, consider installing CocoaDialog."
@@ -154,9 +151,8 @@ end
 
 def parse_csv(file)
 	rows = []
-	CSV.open(file, "r") do |row|
-		rows << row
-	end
+	lines = File.read(file).split("\n").reject { |l| l.empty? }
+	rows = lines.map { |r| r.split(",") }
 
 	header = rows.shift
 
