@@ -64,6 +64,10 @@ def replace_tags(text, custom_values)
 		replace_key = "{{#{ key }}}"
 		text = text.gsub(replace_key, value)
 	end
+	if text.include?("{{") && text.include?("}}")
+		puts "Template contains a merge tag {{like_this}} wasn't in the mailing list."
+		exit
+	end
 	text
 end
 
@@ -74,7 +78,7 @@ def load_mailing_list(config)
 		parse_csv(list_file)
 
 	elsif get_input("Test send to #{ config['sender_email'] } (y/n): ").downcase != "y"
-		get_input("Pick mailing list .csv file (press enter): ")
+		get_input("Pick mailing list .csv file (just press enter): ")
 		list_file = open_file_picker("Pick List File")
 		parse_csv(list_file)
 	else
@@ -91,7 +95,7 @@ def load_template
 	template_file = ARGV[0]
 
 	if template_file.nil? || !File.exist?(template_file)
-		get_input("Pick template .txt file (press enter): ")
+		get_input("Pick template .txt file (just press enter): ")
 		template_file = open_file_picker("Pick Template File")
 	end
 	puts File.exist?(template_file)
