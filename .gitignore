@@ -3,3 +3,4 @@
 /lists/*
 !/lists/sample.csv
 config.txt
+.ruby-version
