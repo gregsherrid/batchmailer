@@ -9,6 +9,12 @@ def main
 	template = load_template
 	mailing_list = load_mailing_list(config)
 
+	puts "---"
+	puts mailing_list
+	puts "---"
+
+	config["sender_password"] ||= get_input("Enter password (won't be saved): ")
+
 	mailing_list.each do |member|
 		puts "Sending #{ member["email"] }..."
 		message = compose_message(member, template, config)
@@ -49,7 +55,7 @@ def send_message(member, message, config)
 	smtp = Net::SMTP.new('smtp.gmail.com', 587)
 	smtp.enable_starttls
 
-	password = config["sender_password"] ||= get_input("Enter password (won't be saved): ")
+	password = config["sender_password"]
 
 	smtp.start('gmail.com', config["sender_email"], password, :login)
 	smtp.send_message(message, config["sender_display_email"], member["email"])
@@ -71,8 +77,8 @@ def load_mailing_list(config)
 		parse_csv(list_file)
 
 	elsif get_input("Test send to #{ config['sender_email'] } (y/n): ").downcase != "y"
-		get_input("Pick list .csv file (press enter): ")
-		list_file = open_file_picker("Pick Template File")
+		get_input("Pick mailing list .csv file (press enter): ")
+		list_file = open_file_picker("Pick List File")
 		parse_csv(list_file)
 	else
 		# Load test data
@@ -89,7 +95,7 @@ def load_template
 
 	if template_file.nil? || !File.exist?(template_file)
 		get_input("Pick template .txt file (press enter): ")
-		template_file = open_file_picker("Pick List File")
+		template_file = open_file_picker("Pick Template File")
 	end
 	puts File.exist?(template_file)
 	File.read(template_file)
@@ -138,8 +144,11 @@ end
 def open_file_picker(title)
 	if RUBY_PLATFORM.include?("linux")
 		`zenity --title=#{ title } --file-selection`.strip
+	elsif File.exist?(COCOA_DIALOG_PATH + "--")
+		`#{ COCOA_DIALOG_PATH } fileselect --title=#{ title }`.strip
 	else
-
+		puts "NOTICE: If you are using MacOS, consider installing CocoaDialog."
+		get_input("Please enter the file path for: '#{ title }': ")
 	end
 end
 
@@ -148,6 +157,7 @@ def parse_csv(file)
 	CSV.open(file, "r") do |row|
 		rows << row
 	end
+
 	header = rows.shift
 
 	rows.map do |row|
@@ -161,6 +171,7 @@ def parse_csv(file)
 	end
 end
 
+COCOA_DIALOG_PATH = "/Applications/CocoaDialog.app/Contents/MacOS/CocoaDialog"
 CONFIG_PATH = "./config.txt"
 
 # Template flags
