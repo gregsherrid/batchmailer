@@ -53,9 +53,15 @@ def send_message(member, message, config)
 	smtp.enable_starttls
 
 	password = config["sender_password"]
+	from = config["sender_display_email"]
+	bcc = config["bcc_email"] 
 
 	smtp.start('gmail.com', config["sender_email"], password, :login)
-	smtp.send_message(message, config["sender_display_email"], member["email"])
+	if bcc
+		smtp.send_message(message, from, member["email"])
+	else
+		smtp.send_message(message, from, member["email"], bcc)		
+	end
 	smtp.finish
 end
 
@@ -125,6 +131,11 @@ def get_config
 		config["sender_display_email"] = get_input("Alternate display email: ")
 	else
 		config["sender_display_email"] = config["sender_email"]
+	end
+
+	config["use_bcc"] = get_input("Add BCC address (y/n): ").downcase
+	if config["use_bcc"] == "y"
+		config["bcc_email"] = get_input("BCC address: ")
 	end
 
 	File.open(CONFIG_PATH, "w") do |file|
