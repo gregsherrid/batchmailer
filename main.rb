@@ -166,8 +166,8 @@ end
 
 def parse_csv(file)
 	rows = []
-	lines = File.read(file).split("\n").reject { |l| l.empty? }
-	rows = lines.map { |r| r.split(",") }
+	lines = File.read(file).split("\n").map(&:strip).reject { |l| l.empty? }
+	rows = lines.map { |r| r.split(",").map(&:strip) }
 
 	header = rows.shift
 
