@@ -58,9 +58,9 @@ def send_message(member, message, config)
 
 	smtp.start('gmail.com', config["sender_email"], password, :login)
 	if bcc
-		smtp.send_message(message, from, member["email"])
+		smtp.send_message(message, from, member["email"], bcc)
 	else
-		smtp.send_message(message, from, member["email"], bcc)		
+		smtp.send_message(message, from, member["email"])		
 	end
 	smtp.finish
 end
