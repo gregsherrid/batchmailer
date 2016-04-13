@@ -71,7 +71,7 @@ def replace_tags(text, custom_values)
 		text = text.gsub(replace_key, value)
 	end
 	if text.include?("{{") && text.include?("}}")
-		puts "Template contains a merge tag {{like_this}} wasn't in the mailing list."
+		puts "Template contains a merge tag {{like_this}} that wasn't in the mailing list."
 		exit
 	end
 	text
@@ -166,8 +166,8 @@ end
 
 def parse_csv(file)
 	rows = []
-	lines = File.read(file).split("\n").reject { |l| l.empty? }
-	rows = lines.map { |r| r.split(",") }
+	lines = File.read(file).split("\n").map(&:strip).reject { |l| l.empty? }
+	rows = lines.map { |r| r.split(",").map(&:strip) }
 
 	header = rows.shift
 
