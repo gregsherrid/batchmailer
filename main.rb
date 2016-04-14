@@ -8,15 +8,22 @@ def main
 	template = load_template
 	mailing_list = load_mailing_list(config)
 
-	config["sender_password"] ||= get_input("Enter password (won't be saved): ")
+	password = config["sender_password"] || get_input("Enter password (won't be saved): ")
+
+	smtp = Net::SMTP.new('smtp.gmail.com', 587)
+	smtp.enable_starttls
+
+	smtp.start('gmail.com', config["sender_email"], password, :login)
 
 	mailing_list.each do |member|
 		if member["email"] && !member["email"].empty?
 			puts "Sending #{ member["email"] }..."
 			message = compose_message(member, template, config)
-			send_message(member, message, config)
+			send_message(member, message, config, smtp)
 		end
 	end
+
+	smtp.finish
 end
 
 def compose_message(member, template, config)
@@ -48,21 +55,16 @@ def compose_message(member, template, config)
 	message
 end
 
-def send_message(member, message, config)
-	smtp = Net::SMTP.new('smtp.gmail.com', 587)
-	smtp.enable_starttls
-
+def send_message(member, message, config, smtp)
 	password = config["sender_password"]
 	from = config["sender_display_email"]
 	bcc = config["bcc_email"] 
 
-	smtp.start('gmail.com', config["sender_email"], password, :login)
 	if bcc
 		smtp.send_message(message, from, member["email"], bcc)
 	else
 		smtp.send_message(message, from, member["email"])		
 	end
-	smtp.finish
 end
 
 def replace_tags(text, custom_values)
