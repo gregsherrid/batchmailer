@@ -15,7 +15,16 @@ def main
 
 	smtp.start('gmail.com', config["sender_email"], password, :login)
 
-	mailing_list.each do |member|
+	mailing_list.each_with_index do |member, i|
+		if (i != 0) && ((i % 75) == 0)
+			smtp.finish
+			puts "Pausing for 1 minute (every 75 sends)..."
+			sleep(1.minute)
+			
+			smtp = Net::SMTP.new('smtp.gmail.com', 587)
+			smtp.enable_starttls
+			smtp.start('gmail.com', config["sender_email"], password, :login)
+		end
 		if member["email"] && !member["email"].empty?
 			puts "Sending #{ member["email"] }..."
 			message = compose_message(member, template, config)
