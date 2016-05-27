@@ -19,7 +19,7 @@ def main
 		if (i != 0) && ((i % 75) == 0)
 			smtp.finish
 			puts "Pausing for 1 minute (every 75 sends)..."
-			sleep(1.minute)
+			sleep(60)
 			
 			smtp = Net::SMTP.new('smtp.gmail.com', 587)
 			smtp.enable_starttls
