@@ -4,3 +4,4 @@
 !/lists/sample.csv
 config.txt
 .ruby-version
+.DS_Store

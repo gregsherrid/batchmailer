@@ -18,8 +18,8 @@ def main
 	mailing_list.each_with_index do |member, i|
 		if (i != 0) && ((i % 75) == 0)
 			smtp.finish
-			puts "Pausing for 1 minute (every 75 sends)..."
-			sleep(60)
+			puts "Pausing for 5 minutes (every 75 sends)..."
+			sleep(300)
 			
 			smtp = Net::SMTP.new('smtp.gmail.com', 587)
 			smtp.enable_starttls
