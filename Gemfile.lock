@@ -1,11 +1,15 @@
 GEM
   remote: https://rubygems.org/
   specs:
+    csv (1.0.1)
+    redcarpet (3.4.0)
 
 PLATFORMS
   ruby
 
 DEPENDENCIES
+  csv
+  redcarpet
 
 BUNDLED WITH
-   1.11.2
+   1.16.1

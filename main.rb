@@ -1,6 +1,9 @@
-require 'net/smtp'
-require 'rubygems'
-require 'json'
+require "net/smtp"
+require "rubygems"
+require "json"
+require "csv"
+require "redcarpet"
+require 'redcarpet/render_strip'
 
 def main
 	config = get_config
@@ -10,10 +13,10 @@ def main
 
 	password = config["sender_password"] || get_input("Enter password (won't be saved): ")
 
-	smtp = Net::SMTP.new('smtp.gmail.com', 587)
+	smtp = Net::SMTP.new("smtp.gmail.com", 587)
 	smtp.enable_starttls
 
-	smtp.start('gmail.com', config["sender_email"], password, :login)
+	smtp.start("gmail.com", config["sender_email"], password, :login)
 
 	mailing_list.each_with_index do |member, i|
 		if (i != 0) && ((i % 75) == 0)
@@ -21,9 +24,9 @@ def main
 			puts "Pausing for 5 minutes (every 75 sends)..."
 			sleep(300)
 			
-			smtp = Net::SMTP.new('smtp.gmail.com', 587)
+			smtp = Net::SMTP.new("smtp.gmail.com", 587)
 			smtp.enable_starttls
-			smtp.start('gmail.com', config["sender_email"], password, :login)
+			smtp.start("gmail.com", config["sender_email"], password, :login)
 		end
 		if member["email"] && !member["email"].empty?
 			puts "Sending #{ member["email"] }..."
@@ -59,8 +62,37 @@ def compose_message(member, template, config)
 	from << " <#{ config['sender_display_email'] }>"
 
 	to = member['email']
-	
+
+	if template.include?("{---MARKDOWN---}")
+		message = format_markdown_message(from, to, subject, body)
+	else
+		message = format_plain_text_message(from, to, subject, body)
+	end
+	message
+end
+
+def format_plain_text_message(from, to, subject, body)
 	message = "From: #{ from }\nTo: #{ to }\nSubject: #{ subject }\n#{ body }"
+	message
+end
+
+def format_markdown_message(from, to, subject, body)
+	renderer = Redcarpet::Render::HTML.new(hard_wrap: true)
+	html_markdown = Redcarpet::Markdown.new(renderer, extensions = {})
+	html_body = html_markdown.render(body)
+	html_body = "<html><body>#{ html_body }</body></html>"
+
+	plain_markdown = Redcarpet::Markdown.new(Redcarpet::Render::StripDown)
+	plain_body = plain_markdown.render(body)
+	
+	message = "MIME-Version: 1.0"
+	message << "\nFrom: #{ from }\nTo: #{ to }\nSubject: #{ subject }"
+	message << "\nContent-Type: multipart/alternative; boundary=\"2012squid\""
+	message << "\n--2012squid\nContent-Type: text/plain; charset=\"UTF-8\""
+	message << "\n\n" + plain_body
+	message << "\n--2012squid\nContent-Type: text/html; charset=\"UTF-8\""
+	message << "\n\n" + html_body
+	message << "\n--2012squid--"
 	message
 end
 
@@ -115,7 +147,6 @@ def load_template
 		get_input("Pick template .txt file (just press enter): ")
 		template_file = open_file_picker("Pick Template File")
 	end
-	puts File.exist?(template_file)
 	File.read(template_file)
 end
 
@@ -176,6 +207,16 @@ def open_file_picker(title)
 end
 
 def parse_csv(file)
+	rows = []
+	CSV.foreach("path/to/file.csv", headers: true) do |row|
+		rows.append(row.to_h)
+	end
+
+	rows
+end
+
+# From when we couldn't have the "CSV" gem
+def parse_csv_legacy(file)
 	rows = []
 	lines = File.read(file).split("\n").map(&:strip).reject { |l| l.empty? }
 	rows = lines.map { |r| r.split(",").map(&:strip) }
