@@ -208,8 +208,8 @@ end
 
 def parse_csv(file)
 	rows = []
-	CSV.foreach("path/to/file.csv", headers: true) do |row|
-		rows.append(row.to_h)
+	CSV.foreach(file, headers: true) do |row|
+		rows << row.to_h
 	end
 
 	rows
