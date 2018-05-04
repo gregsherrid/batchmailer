@@ -1,7 +1,9 @@
 /templates/*
 !/templates/sample.txt
+!/templates/sample.md
 /lists/*
 !/lists/sample.csv
+!/lists/sample-webhook.csv
 config.txt
 .ruby-version
 .DS_Store

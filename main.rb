@@ -1,9 +1,11 @@
-require "net/smtp"
 require "rubygems"
 require "json"
 require "csv"
 require "redcarpet"
-require 'redcarpet/render_strip'
+require "redcarpet/render_strip"
+
+require "./lib/webhook_message"
+require "./lib/smtp_connection"
 
 def main
 	config = get_config
@@ -11,40 +13,43 @@ def main
 	template = load_template
 	mailing_list = load_mailing_list(config)
 
-	password = config["sender_password"] || get_input("Enter password (won't be saved): ")
+	from = config["sender_display_email"]
+	bcc = config["bcc_email"] 
 
-	smtp = Net::SMTP.new("smtp.gmail.com", 587)
-	smtp.enable_starttls
+	smtp_connection = SMTPConnection.new(config["sender_email"], config["sender_password"])
+	webhook = WebhookMessage.new(config["default_webhook_route"], config["default_webhook_token"])
 
-	smtp.start("gmail.com", config["sender_email"], password, :login)
+	mailing_list.each_with_index do |member, index|
 
-	mailing_list.each_with_index do |member, i|
-		if (i != 0) && ((i % 75) == 0)
-			smtp.finish
-			puts "Pausing for 5 minutes (every 75 sends)..."
-			sleep(300)
-			
-			smtp = Net::SMTP.new("smtp.gmail.com", 587)
-			smtp.enable_starttls
-			smtp.start("gmail.com", config["sender_email"], password, :login)
-		end
-		if member["email"] && !member["email"].empty?
-			puts "Sending #{ member["email"] }..."
-			message = compose_message(member, template, config)
-			send_message(member, message, config, smtp)
+		if ((!member["email"].to_s.empty?) || (!member["user_id"].to_s.empty?))
+			id_line = [member["user_id"], member["email"]].compact.join("/")
+			puts "Sending #{ id_line }..."
+			message_data = compose_message(member, template, config)
+
+			type = message_data[:type]
+			message = message_data[:message]
+
+			if type == WEBHOOK
+				webhook.send_message(member["user_id"], JSON.parse(message))
+			else
+				smtp_connection.send_message(message, from, member["email"], bcc)
+			end
 		end
 	end
 
-	smtp.finish
+	smtp_connection.close
 end
 
 def compose_message(member, template, config)
-	subject = template.match(/#{ BEGIN_SUBJECT }.*#{ END_SUBJECT }/m)
-	if subject.nil? || subject.length != 1
-		puts "Template should have one SUBJECT"
-		exit
+	custom_values = config.merge(member)
+
+	if template.include?("{---MARKDOWN---}")
+		type = MARKDOWN_EMAIL
+	elsif template.include?("{---WEBHOOK---}")
+		type = WEBHOOK
+	else
+		type = PLAINTEXT_EMAIL
 	end
-	subject = subject[0].gsub(/#{ BEGIN_SUBJECT }/, "").gsub(/#{ END_SUBJECT }/, "").strip
 
 	body = template.match(/#{ BEGIN_BODY }.*#{ END_BODY }/m)
 	if body.nil? || body.length != 1
@@ -52,23 +57,37 @@ def compose_message(member, template, config)
 		exit
 	end
 	body = body[0].gsub(/#{BEGIN_BODY}/, "").gsub(/#{ END_BODY }/, "").strip
-
-	custom_values = config.merge(member)
-
-	subject = replace_tags(subject, custom_values)
 	body = replace_tags(body, custom_values)
 
-	from = "#{ config['sender_first_name'] } #{ config['sender_last_name'] }"
-	from << " <#{ config['sender_display_email'] }>"
+	if type != WEBHOOK
+		subject = template.match(/#{ BEGIN_SUBJECT }.*#{ END_SUBJECT }/m)
+		if subject.nil? || subject.length != 1
+			puts "Template should have one SUBJECT"
+			exit
+		end
+		subject = subject[0].gsub(/#{ BEGIN_SUBJECT }/, "").gsub(/#{ END_SUBJECT }/, "").strip
+		subject = replace_tags(subject, custom_values)
 
-	to = member['email']
-
-	if template.include?("{---MARKDOWN---}")
-		message = format_markdown_message(from, to, subject, body)
-	else
-		message = format_plain_text_message(from, to, subject, body)
+		from = "#{ config['sender_first_name'] } #{ config['sender_last_name'] }"
+		from << " <#{ config['sender_display_email'] }>"
+		to = member['email']
 	end
-	message
+
+
+	if type == MARKDOWN_EMAIL
+		message = format_markdown_message(from, to, subject, body)
+
+	elsif type == WEBHOOK
+		message = body
+
+	elsif type == PLAINTEXT_EMAIL
+		message = format_plain_text_message(from, to, subject, body)
+
+	else
+		raise "Unknown Type: #{ type }"
+	end
+
+	{ type: type, message: message }
 end
 
 def format_plain_text_message(from, to, subject, body)
@@ -96,18 +115,6 @@ def format_markdown_message(from, to, subject, body)
 	message
 end
 
-def send_message(member, message, config, smtp)
-	password = config["sender_password"]
-	from = config["sender_display_email"]
-	bcc = config["bcc_email"] 
-
-	if bcc
-		smtp.send_message(message, from, member["email"], bcc)
-	else
-		smtp.send_message(message, from, member["email"])		
-	end
-end
-
 def replace_tags(text, custom_values)
 	custom_values.each_pair do |key, value|
 		replace_key = "{{#{ key }}}"
@@ -126,7 +133,7 @@ def load_mailing_list(config)
 	if list_file && File.exist?(list_file)
 		parse_csv(list_file)
 
-	elsif get_input("Test send to #{ config['sender_email'] } (y/n): ").downcase != "y"
+	elsif get_input("Test send (y/n): ").downcase != "y"
 		get_input("Pick mailing list .csv file (just press enter): ")
 		list_file = open_file_picker("Pick List File")
 		parse_csv(list_file)
@@ -135,6 +142,7 @@ def load_mailing_list(config)
 		[{
 			"first_name" => config["sender_first_name"] + '[test]',
 			"last_name" => config["sender_last_name"] + '[test]',
+			"user_id" => config["test_webhook_user_id"],
 			"email" => config["sender_email"].gsub("@","+test@")
 		}]
 	end
@@ -180,19 +188,18 @@ def get_config
 		config["bcc_email"] = get_input("BCC address: ")
 	end
 
+	config["default_webhook_route"] = get_input("Default webhook endpoint (or leave blank): ")
+	config["default_webhook_token"] = get_input("Default webhook token (or leave blank): ")
+	config["test_webhook_user_id"] = get_input("Test webhook user ID (or leave blank): ")
+
 	File.open(CONFIG_PATH, "w") do |file|
-		file.puts config.to_json
+		file.puts JSON.pretty_generate(config)
 	end
 	return parse_config_file
 end
 
 def parse_config_file
 	JSON.parse(File.read(CONFIG_PATH))
-end
-
-def get_input(query)
-	print query
-	STDIN.gets.chomp.strip
 end
 
 def open_file_picker(title)
@@ -204,6 +211,11 @@ def open_file_picker(title)
 		puts "NOTICE: If you are using MacOS, consider installing CocoaDialog."
 		get_input("Please enter the file path for: '#{ title }': ")
 	end
+end
+
+def get_input(prompt)
+	print prompt
+	@password = STDIN.gets.chomp.strip
 end
 
 def parse_csv(file)
@@ -234,8 +246,12 @@ def parse_csv_legacy(file)
 	end
 end
 
+PLAINTEXT_EMAIL = "plaintext_email"
+MARKDOWN_EMAIL = "markdown_email"
+WEBHOOK = "webhook"
+
 COCOA_DIALOG_PATH = "/Applications/CocoaDialog.app/Contents/MacOS/CocoaDialog"
-CONFIG_PATH = "./config.txt"
+CONFIG_PATH = "./config.json"
 
 # Template flags
 BEGIN_SUBJECT = "\\{---BEGIN_SUBJECT---\\}"
