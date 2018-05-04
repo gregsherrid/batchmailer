@@ -4,6 +4,6 @@
 /lists/*
 !/lists/sample.csv
 !/lists/sample-webhook.csv
-config.txt
+config.*
 .ruby-version
 .DS_Store
