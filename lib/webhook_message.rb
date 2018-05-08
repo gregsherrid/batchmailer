@@ -29,10 +29,7 @@ class WebhookMessage
 
 		url = "#{ full_route }?#{ query }"
 
-		puts url
-
 		response = HTTParty.get(url, body: data.to_json, headers: JSON_HEADERS)
-		puts response
 		if response.code < 200 || response.code >= 300
 			raise "Error\nWebook HTTP Status: #{ response['code'] }. #{ response['message'] }"
 		end
